@@ -3,12 +3,18 @@
 
     python3 runners/endpoint_text.py --run RUN_DIR --env-file .env.eval [--shards NAME ...] [--model ID]
                                      [--max-tokens N] [--workers N] [--limit N] [--log DIR]
+                                     [--temperature T] [--seed N] [--extra-json '{...}'] [--working-in-reply]
 
 For every text shard of RUN_DIR/shards (a shard whose items all have `surface: answer` and no attachments) it sends
 each item on its own, with the rules of the shard's README that apply to a text item, and writes the reply to
 `answers/answers.jsonl` in the format the README asks for. It is not an agent: the model gets no tools, no files and
 no second turn, so there is nothing for a transcript audit to look at. Items that already have an answer line are
 skipped, so an interrupted run can be started again.
+
+Every request carries `temperature` (--temperature, default 0), `seed` when --seed is given, and the fields of
+--extra-json (for example '{"enable_thinking": true}' where a service switches reasoning on that way). With
+--working-in-reply the model is told to write its working in the reply and to end with the answer as one JSON object,
+and the last JSON object of the reply is taken; without it the prompt and the reading of the reply are as they were.
 
 The endpoint address and the token come from the env file (QANDY_EVAL_HF_ENDPOINT, QANDY_EVAL_HF_TOKEN). The token is
 only ever put into the request header: it is never printed, logged or written to a file. Raw replies and token counts
@@ -44,11 +50,24 @@ the format gives, a `list` is a JSON array.
 Do your working in your reasoning, not in the reply. Reply with the answer as one JSON object and nothing else:
 no working, no explanation, no text before or after it."""
 
+# --working-in-reply: the same format lines, with the working asked for in the reply and the answer at its end
+WORKING_OBJECT_FORMAT = """Answer format: an object with exactly these field names: {fields}.
+A `number` is a JSON number (no currency sign, no thousands separator), a `label` is one of the options the prompt or
+the format gives, a `list` is a JSON array.
+Work step by step in your reply before you answer: state the rule that applies, list the inputs, and compute each
+figure by hand. Then end your reply with the answer as one JSON object on its own, with nothing after it. Only the
+last JSON object of your reply is read as your answer."""
+
 TEXT_FORMAT = """Answer format: free text. Write the whole answer for the person who asked, in their language. Your reply is the
 answer as it will be read: do not add a preface about the evaluation."""
 
 OTHER_FORMAT = """Answer format: {fmt}
 Follow it and the prompt. Reply with the answer as JSON and nothing else."""
+
+WORKING_OTHER_FORMAT = """Answer format: {fmt}
+Follow it and the prompt. Work step by step in your reply before you answer: state the rule that applies, list the
+inputs, and compute each figure by hand. Then end your reply with the answer as JSON on its own, with nothing after
+it. Only the last JSON value of your reply is read as your answer."""
 
 
 def load_env(path):
@@ -111,7 +130,7 @@ class Endpoint:
                 req.add_header("Authorization", "Bearer " + self._token)
                 req.add_header("Content-Type", "application/json")
                 req.add_header("Accept", "text/event-stream")
-                text, finish, usage = [], None, None
+                text, thought, finish, usage = [], [], None, None
                 with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                     for raw in resp:
                         line = raw.decode("utf-8", "replace").strip()
@@ -126,13 +145,20 @@ class Endpoint:
                             continue
                         usage = chunk.get("usage") or usage
                         for choice in chunk.get("choices") or []:
-                            piece = (choice.get("delta") or {}).get("content")
+                            delta = choice.get("delta") or {}
+                            piece = delta.get("content")
                             if piece:
                                 text.append(piece)
+                            piece = delta.get("reasoning_content") or delta.get("reasoning")  # reasoning sent beside the reply
+                            if piece and isinstance(piece, str):
+                                thought.append(piece)
                             finish = choice.get("finish_reason") or finish
                 if not text and finish is None:
                     raise RuntimeError("the stream ended with no content")
-                return {"choices": [{"message": {"content": "".join(text)}, "finish_reason": finish}], "usage": usage}
+                message = {"content": "".join(text)}
+                if thought:
+                    message["reasoning_content"] = "".join(thought)
+                return {"choices": [{"message": message, "finish_reason": finish}], "usage": usage}
             except urllib.error.HTTPError as e:
                 detail = f"HTTP {e.code}: {e.read().decode('utf-8', 'replace')[:300]}"
                 retry = e.code == 429 or e.code >= 500
@@ -145,15 +171,17 @@ class Endpoint:
             raise RuntimeError(detail)
 
 
-def user_message(item):
+def user_message(item, working=False):
+    """The request for one item. `working` (--working-in-reply): the working is asked for in the reply, before the
+    answer. A free-text answer is the reply itself, so its request is the same either way."""
     fmt = item.get("answer_format") or {}
     head = {k: item.get(k) for k in ("id", "jurisdiction", "domain", "family", "as_of", "language", "mode")}
     if fmt.get("type") == "object":
-        how = OBJECT_FORMAT.format(fields=json.dumps(fmt.get("fields"), ensure_ascii=False))
+        how = (WORKING_OBJECT_FORMAT if working else OBJECT_FORMAT).format(fields=json.dumps(fmt.get("fields"), ensure_ascii=False))
     elif fmt.get("type") == "text":
         how = TEXT_FORMAT
     else:
-        how = OTHER_FORMAT.format(fmt=json.dumps(fmt, ensure_ascii=False))
+        how = (WORKING_OTHER_FORMAT if working else OTHER_FORMAT).format(fmt=json.dumps(fmt, ensure_ascii=False))
     return f"Item: {json.dumps(head, ensure_ascii=False)}\n\n{item['prompt']}\n\n{how}"
 
 
@@ -181,17 +209,75 @@ def last_json(text, fields=None):
     return best
 
 
-def answer_of(item, reply):
-    """(answer, problem): what goes into answers.jsonl for this reply."""
+def last_whole_json(text, fields=None):
+    """For a reply that holds working before its answer (--working-in-reply): the last JSON value that stands on its
+    own in the text, not a part of another value, whatever JSON the working before it holds. With `fields` it must be
+    an object with at least one of those names, or hold one (an answer wrapped in something); if it is neither, the
+    reply has no answer."""
+    text = re.sub(r"```(?:json)?", "", text)
+    decoder, opening, found, at = json.JSONDecoder(), re.compile(r"[\[{]"), [], 0
+    while True:
+        m = opening.search(text, at)
+        if m is None:
+            break
+        try:
+            value, at = decoder.raw_decode(text, m.start())  # go on after the value: what it holds is not looked at again
+        except json.JSONDecodeError:
+            at = m.start() + 1
+            continue
+        found.append(value)
+    if not found:
+        return None
+    last = found[-1]
+    if fields is None or (isinstance(last, dict) and set(last) & set(fields)):
+        return last
+    return last_json(json.dumps(last, ensure_ascii=False), fields)
+
+
+def answer_of(item, reply, working=False):
+    """(answer, problem): what goes into answers.jsonl for this reply. `working`: the reply may hold working with JSON
+    in it before the answer, so the last JSON object is taken, whatever came before it."""
     fmt = item.get("answer_format") or {}
     text = visible(reply)
     if fmt.get("type") == "text":
         return (text, None) if text else (None, "empty reply")
     fields = list((fmt.get("fields") or {})) if fmt.get("type") == "object" else None
-    value = last_json(text, fields)
+    value = (last_whole_json if working else last_json)(text, fields)
     if value is None:
         return None, "no JSON answer found in the reply"
     return value, None
+
+
+def request_fields(temperature, seed=None, thinking_budget=None, extra_json=None):
+    """The fields every request carries besides the model, the messages and max_tokens: the temperature, the seed if
+    one is given, the thinking budget if one is given, then the fields of --extra-json (which win over the others)."""
+    fields = {"temperature": temperature}
+    if seed is not None:
+        fields["seed"] = seed
+    if thinking_budget:
+        fields["thinking_token_budget"] = thinking_budget
+    if extra_json:
+        try:
+            more = json.loads(extra_json)
+        except json.JSONDecodeError as e:
+            sys.exit(f"--extra-json is not JSON: {e}")
+        if not isinstance(more, dict):
+            sys.exit("--extra-json must be a JSON object")
+        fields.update(more)
+    return fields
+
+
+def reasoning_off(fields):
+    """The fields of the finalization request: those of every request, with reasoning switched off (it asks only for
+    the answer to be stated). `reasoning_effort: none` as before; a switch that the fields themselves turned on
+    (enable_thinking, also inside chat_template_kwargs) is turned off, and a thinking budget is left out."""
+    out = {k: v for k, v in (fields or {}).items() if k != "thinking_token_budget"}
+    if "enable_thinking" in out:
+        out["enable_thinking"] = False
+    if isinstance(out.get("chat_template_kwargs"), dict) and "enable_thinking" in out["chat_template_kwargs"]:
+        out["chat_template_kwargs"] = dict(out["chat_template_kwargs"], enable_thinking=False)
+    out["reasoning_effort"] = "none"
+    return out
 
 
 def text_shards(run_dir, names):
@@ -217,6 +303,11 @@ def main():
     ap.add_argument("--max-tokens", type=int, default=6000)
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--thinking-budget", type=int, help="cap on reasoning tokens, sent as thinking_token_budget (counts toward --max-tokens)")
+    ap.add_argument("--temperature", type=float, default=0.0, help="sampling temperature, sent with every request (default 0)")
+    ap.add_argument("--seed", type=int, help="sampling seed, sent with every request when given")
+    ap.add_argument("--extra-json", help="more request fields as a JSON object, merged into every request")
+    ap.add_argument("--working-in-reply", action="store_true",
+                    help="ask for the working in the reply, then the answer as one JSON object at its end; the last JSON object of the reply is taken")
     ap.add_argument("--limit", type=int, help="answer at most this many items (a trial)")
     ap.add_argument("--log")
     ap.add_argument("--probe", action="store_true", help="only say which models the endpoint serves")
@@ -255,18 +346,22 @@ def main():
     if args.limit:
         jobs = jobs[:args.limit]
     print(f"{len(jobs)} items to answer with {model}, {args.workers} at a time")
+    extra = request_fields(args.temperature, args.seed, args.thinking_budget, args.extra_json)
+    print(f"request fields: {json.dumps(extra, ensure_ascii=False)}; max_tokens {args.max_tokens}; working in reply: {'yes' if args.working_in_reply else 'no'}")
 
     def one(job):
         shard, item = job
         started = time.time()
         try:
-            messages = [{"role": "system", "content": RULES}, {"role": "user", "content": user_message(item)}]
-            reply = endpoint.chat(model, messages, args.max_tokens,
-                                  extra={"thinking_token_budget": args.thinking_budget} if args.thinking_budget else None)
+            messages = [{"role": "system", "content": RULES}, {"role": "user", "content": user_message(item, args.working_in_reply)}]
+            reply = endpoint.chat(model, messages, args.max_tokens, extra=extra)
             choice = (reply.get("choices") or [{}])[0]
             text = (choice.get("message") or {}).get("content") or ""
-            answer, problem = answer_of(item, text)
+            thought = (choice.get("message") or {}).get("reasoning_content") or ""
+            answer, problem = answer_of(item, text, args.working_in_reply)
             record = {"id": item["id"], "finish_reason": choice.get("finish_reason"), "usage": reply.get("usage"), "reply": text}
+            if thought:
+                record["reasoning_chars"] = len(thought)
             # When its reasoning budget runs out this model goes on reasoning in the reply and can reach the token limit
             # without an answer. Then it is asked once, with reasoning off, to state its answer from the working it wrote.
             if answer is None or choice.get("finish_reason") == "length":
@@ -274,10 +369,11 @@ def main():
                 ask = ("Stop working now. From your working above, " + (
                     "write your final answer for the person who asked, in their language, as it will be read: no working, no preface."
                     if as_text else "give your final answer as the JSON object in the format asked, and nothing else."))
-                second = endpoint.chat(model, messages + [{"role": "assistant", "content": visible(text)[-30000:] or "(nothing written yet)"},
-                                                          {"role": "user", "content": ask}], 4000 if as_text else 1500, extra={"reasoning_effort": "none"})
+                # the working it wrote: its reply, or, when the limit was reached before any reply, the reasoning the service sent beside it
+                second = endpoint.chat(model, messages + [{"role": "assistant", "content": visible(text)[-30000:] or thought[-30000:] or "(nothing written yet)"},
+                                                          {"role": "user", "content": ask}], 4000 if as_text else 1500, extra=reasoning_off(extra))
                 final = ((second.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
-                again, why = answer_of(item, final)
+                again, why = answer_of(item, final, args.working_in_reply)
                 record.update(finalized=True, usage_final=second.get("usage"), reply_final=final)
                 if again is not None:
                     answer, problem = again, None

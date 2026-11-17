@@ -9,24 +9,24 @@ covers five domains in nine jurisdictions, and every answer is graded against an
 It is built by [QANDY](https://qandy.ai), the company behind QANDY SAVE and the QANDY 2.0 model.
 Results are also shown at [qandy.ai/qandyeval](https://qandy.ai/qandyeval/).
 
-## First results (15 November 2026)
+## First results (15 November 2026; Qwen 3.8 27B run again 17 November)
 
 Overall score, 0 to 100. Higher is better.
 
 | Domain | Claude Fable 5.2 | Claude Opus 5.5 | Qwen 3.8 27B |
 |---|---|---|---|
-| Personal tax | 85 | 35 | 2 |
-| Corporate tax & accounting | 91 | 39 | 2 |
-| Save | 26 | 23 | 1 |
-| Trading | 70 | 63 | 2 |
-| Insurance | 62 | 26 | 3 |
-| **Overall** | **67** | **37** | **2** |
+| Personal tax | 85 | 35 | 4 |
+| Corporate tax & accounting | 91 | 39 | 4 |
+| Save | 26 | 23 | 4 |
+| Trading | 70 | 63 | 7 |
+| Insurance | 62 | 26 | 6 |
+| **Overall** | **67** | **37** | **5** |
 
 By tier:
 
 | Tier (weight) | Claude Fable 5.2 | Claude Opus 5.5 | Qwen 3.8 27B |
 |---|---|---|---|
-| Core (20%) | 90 | 85 | 10 |
+| Core (20%) | 90 | 85 | 24 |
 | Hard (50%) | 73 | 32 | 0 |
 | Expert (30%) | 42 | 14 | 0 |
 
@@ -107,11 +107,14 @@ How each model was run for the results above:
 | | Claude Fable 5.2, Claude Opus 5.5 | Qwen 3.8 27B |
 |---|---|---|
 | Access | Agent with file and shell tools, extra-high reasoning effort | Hosted OpenAI-compatible API, driven by the agent loop in [`runners/`](runners/) |
-| Limits | None beyond the run rules | 120 steps per core shard, 200 per case, 6,000 tokens a step, at most 4 page images per request (a limit of the service) |
+| Limits | None beyond the run rules | 120 steps per core shard, 200 per case, 16,000 tokens a step, at most 4 page images per request (a limit of the service); reasoning off, because the service cannot cap it; text questions answered with the working written in the reply |
 | Core tier | One run | One run |
 | Hard and expert | Three runs | Three runs |
 
-All 45 hard and expert solver transcripts of each Claude model passed the audit. Both judges gave the same tier scores for every model.
+All 45 hard and expert solver transcripts of each Claude model passed the audit. Both judges gave the same tier scores for
+the Claude models and for Qwen 3.8 27B's first run. Qwen's second run has so far been marked by one judge (Claude Opus
+5.5); its hard and expert scores cannot depend on the judge, because no case had its other deliverables right in all
+three runs and no question was right in all three.
 
 ## Limits of these first results
 
@@ -124,8 +127,17 @@ All 45 hard and expert solver transcripts of each Claude model passed the audit.
 - **Same-family effects.** The items were written with the help of a model from the same family as two of the models
   tested, and the judge of record is one of the models tested. A second judge from a different model cross-checked
   every verdict and reached identical tier scores.
-- **Qwen 3.8 27B hit its step limit** on 27 of 30 case shards and saw at most four page images at a time. Its score
-  reflects that setup as well as the model.
+- **One expert key was found unsupported after publication.** In the expert Hong Kong shop claim, the date by which
+  the employer's notice of an employee's injury is due was keyed from a rule that no allowed source states (the
+  Labour Department's form counts 14 days from the accident). Claude Fable 5.2 answered that way and missed only that
+  date, in all three runs; without it, its overall would be about 70 and its insurance score about 80. The other models' results do
+  not change. The scores above are left as graded; the rebuilt tiers drop that date.
+- **Qwen 3.8 27B was run a second time** on 16 and 17 November, after fixes to the agent loop: the model is now told its
+  step limit and which pages left view, and a reply cut at the token limit is recovered. It had 16,000 tokens a step
+  instead of 6,000, and wrote its working in the reply for text questions. Its overall went from 2 to 5 and its core
+  tier from 10 to 24. It still stopped at its step limit on 18 of 67 core shards and 8 of 30 case shards (27 of 30 the
+  first time), saw at most four page images at a time and ran with reasoning off, so its score reflects that setup as
+  well as the model. The run was paused for 18 hours; the 18 shards it cut off were restarted from clean copies.
 
 ## What is in this repository, and what is not
 

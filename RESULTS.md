@@ -1,4 +1,4 @@
-# QandyEval results, 15 November 2026
+# QandyEval results, 15 November 2026 (Qwen 3.8 27B: 17 November)
 
 Scores are 0 to 100 on "fully correct". Overall = 0.2 x core + 0.5 x hard + 0.3 x expert. Combined = 0.6 x agentic + 0.4 x text.
 A hard or expert item counts only when it is fully correct in all three runs; the core tier is one run.
@@ -76,38 +76,41 @@ The hard and expert tiers are a pilot set: see "Limits of these first results" i
 
 ## Qwen 3.8 27B
 
+Second run, 16 and 17 November 2026, after the agent-loop fixes. The first run (15 November: overall 2, core 10) is in
+this file's git history.
+
 ### Combined (0.6 x agentic + 0.4 x text)
 
 | Domain | Core | Hard | Expert | Overall |
 |---|---|---|---|---|
-| Personal tax | 8 | 0 | 0 | 2 |
-| Corporate tax & accounting | 10 | 0 | 0 | 2 |
-| Save | 4 | 0 | 0 | 1 |
-| Trading | 9 | 0 | 0 | 2 |
-| Insurance | 16 | 0 | 0 | 3 |
-| **All** | 10 | 0 | 0 | **2** |
+| Personal tax | 18 | 0 | 0 | 4 |
+| Corporate tax & accounting | 19 | 0 | 0 | 4 |
+| Save | 23 | 0 | 0 | 4 |
+| Trading | 36 | 0 | 0 | 7 |
+| Insurance | 29 | 0 | 0 | 6 |
+| **All** | 24 | 0 | 0 | **5** |
 
 ### Agentic tasks only
 
 | Domain | Core | Hard | Expert | Overall |
 |---|---|---|---|---|
-| Personal tax | 10 | 0 | 0 | 2 |
-| Corporate tax & accounting | 12 | 0 | 0 | 2 |
-| Save | 0 | 0 | 0 | 0 |
-| Trading | 10 | 0 | 0 | 2 |
-| Insurance | 21 | 0 | 0 | 4 |
-| **All** | 12 | 0 | 0 | **2** |
+| Personal tax | 19 | 0 | 0 | 4 |
+| Corporate tax & accounting | 18 | 0 | 0 | 4 |
+| Save | 4 | 0 | 0 | 1 |
+| Trading | 45 | 0 | 0 | 9 |
+| Insurance | 35 | 0 | 0 | 7 |
+| **All** | 23 | 0 | 0 | **5** |
 
 ### Text questions only
 
 | Domain | Core | Hard | Expert | Overall |
 |---|---|---|---|---|
-| Personal tax | 5 | 0 | 0 | 1 |
-| Corporate tax & accounting | 6 | 0 | 0 | 1 |
-| Save | 11 | 0 | 0 | 2 |
-| Trading | 8 | 0 | 0 | 2 |
-| Insurance | 9 | 0 | 0 | 2 |
-| **All** | 7 | 0 | 0 | **2** |
+| Personal tax | 16 | 0 | 0 | 3 |
+| Corporate tax & accounting | 20 | 0 | 0 | 4 |
+| Save | 50 | 0 | 0 | 10 |
+| Trading | 23 | 0 | 0 | 5 |
+| Insurance | 20 | 0 | 0 | 4 |
+| **All** | 25 | 0 | 0 | **5** |
 
 ## Counts behind the hard and expert tiers
 
@@ -121,6 +124,6 @@ The hard and expert tiers are a pilot set: see "Limits of these first results" i
 ## Run details
 
 - Claude Fable 5.2 and Claude Opus 5.5: one blind solver per shard, extra-high reasoning effort; core tier one run (587 sampled items), hard and expert tiers three runs (15 shards each). All hard and expert transcripts passed the audit.
-- Qwen 3.8 27B: hosted OpenAI-compatible API with the agent loop in `runners/`; 120 steps per core shard, 200 per case shard, 6,000 tokens a step, at most 4 page images per request. 27 of its 30 case shards stopped at the step limit.
-- Letters and advice answers: two independent judges with the same prompt (`docs/JUDGE_PROMPT.md`); both gave the same tier scores for every model.
+- Qwen 3.8 27B (second run): hosted OpenAI-compatible API with the agent loop in `runners/`; 120 steps per core shard, 200 per case shard, 16,000 tokens a step, at most 4 page images per request, reasoning off (the service cannot cap it), temperature 0, seeds 1, 2 and 3 for the three hard and expert runs; text questions with the working written in the reply, 6,000 tokens. 18 of its 67 core shards and 8 of its 30 case shards stopped at the step limit (27 of 30 in the first run). The run was paused for 18 hours; the 18 shards it cut off were restarted from clean copies.
+- Letters and advice answers: two independent judges with the same prompt (`docs/JUDGE_PROMPT.md`); both gave the same tier scores for the Claude models and Qwen's first run. Qwen's second run has so far been marked by the Claude Opus 5.5 judge; its hard and expert scores cannot depend on the judge (no case had its other deliverables right in all three runs, no question was right in all three).
 - 9 live paper-trading items in the core sample are not run yet and are left out of every score.
