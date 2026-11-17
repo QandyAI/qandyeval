@@ -9,29 +9,34 @@ covers five domains in nine jurisdictions, and every answer is graded against an
 It is built by [QANDY](https://qandy.ai), the company behind QANDY SAVE and the QANDY 2.0 model.
 Results are also shown at [qandy.ai/qandyeval](https://qandy.ai/qandyeval/).
 
-## First results (15 November 2026; Qwen 3.8 27B run again 17 November)
+## Results (17 November 2026)
 
 Overall score, 0 to 100. Higher is better.
 
-| Domain | Claude Fable 5.2 | Claude Opus 5.5 | Qwen 3.8 27B |
+| Domain | Claude Fable 5.2 | Claude Opus 5.5 | Qwen 3.8 27B* |
 |---|---|---|---|
-| Personal tax | 85 | 35 | 4 |
-| Corporate tax & accounting | 91 | 39 | 4 |
-| Save | 26 | 23 | 4 |
-| Trading | 70 | 63 | 7 |
-| Insurance | 62 | 26 | 6 |
-| **Overall** | **67** | **37** | **5** |
+| Personal tax | 52 | 50 | 4 |
+| Corporate tax & accounting | 58 | 42 | 4 |
+| Save | 35 | 34 | 4 |
+| Trading | 74 | 66 | 7 |
+| Insurance | 59 | 34 | 6 |
+| **Overall** | **56** | **45** | **5** |
 
 By tier:
 
-| Tier (weight) | Claude Fable 5.2 | Claude Opus 5.5 | Qwen 3.8 27B |
+| Tier (weight) | Claude Fable 5.2 | Claude Opus 5.5 | Qwen 3.8 27B* |
 |---|---|---|---|
 | Core (20%) | 90 | 85 | 24 |
-| Hard (50%) | 73 | 32 | 0 |
-| Expert (30%) | 42 | 14 | 0 |
+| Hard (50%) | 56 | 42 | 0 |
+| Expert (30%) | 32 | 24 | 0 |
 
-Full tables, split into agentic tasks and text questions, are in [RESULTS.md](RESULTS.md). Read the
-[limits of these numbers](#limits-of-these-first-results) before quoting them. QANDY 2.0 27B results will follow.
+\* Qwen 3.8 27B has not been run on the rebuilt hard and expert tiers. Its figures are its core tier and its result on
+the pilot hard and expert tiers, where it had no item right in all three runs.
+
+The hard and expert tiers were rebuilt on fresh cases and replace the pilot set of the first results (15 November),
+on which Claude Fable 5.2 had 67 and Claude Opus 5.5 had 37. Full tables, split into agentic tasks and text questions,
+and the first results are in [RESULTS.md](RESULTS.md). Read the [limits of these numbers](#limits-of-these-results)
+before quoting them. QANDY 2.0 27B results will follow.
 
 ## What is tested
 
@@ -66,7 +71,7 @@ language where the work is done in it.
 | Expert | 30% | The same form as hard, with harder rules, more traps and cross-border facts. |
 
 In the hard and expert tiers the model gets figures and conventions only: no rule notes and no calculator. The current
-hard and expert set is a pilot of 10 cases (one per domain at each level) and 60 questions.
+hard and expert set has 20 cases (two per domain at each level) and 60 questions (40 hard, 20 expert).
 
 ## How answers are scored
 
@@ -109,27 +114,36 @@ How each model was run for the results above:
 | Access | Agent with file and shell tools, extra-high reasoning effort | Hosted OpenAI-compatible API, driven by the agent loop in [`runners/`](runners/) |
 | Limits | None beyond the run rules | 120 steps per core shard, 200 per case, 16,000 tokens a step, at most 4 page images per request (a limit of the service); reasoning off, because the service cannot cap it; text questions answered with the working written in the reply |
 | Core tier | One run | One run |
-| Hard and expert | Three runs | Three runs |
+| Hard and expert | Three runs on the rebuilt tiers | Three runs on the pilot tiers; not run on the rebuilt tiers |
 
-All 45 hard and expert solver transcripts of each Claude model passed the audit. Both judges gave the same tier scores for
+All 75 hard and expert solver transcripts of each Claude model passed the audit. Both judges gave the same tier scores for
 every model (for Qwen 3.8 27B's second run they differ on one core memo, which moves no figure in the tables above).
 
-## Limits of these first results
+## Limits of these results
 
-- **The hard and expert tiers are a pilot.** Their cases and questions were tuned on the answers of Claude Opus 5.5 and
-  Claude Fable 5.2 over several rounds, with five cases at each level. They will be measured again on fresh cases that no
-  calibration run has seen. Expect the numbers to move.
-- **Small sample at the top.** Ten cases decide 60% of the hard and expert tiers. One case is worth several points of
-  the overall score.
+- **The hard and expert tiers are tuned against the two Claude models.** Their cases were hardened on rules that Claude
+  Opus 5.5 and Claude Fable 5.2 got wrong in earlier rounds, so they are harder for these two models than a set
+  written without looking at any model would be. The cases and questions measured here are on draws no run had seen.
+- **Small sample at the top.** Twenty cases decide 60% of the hard and expert tiers. One hard case is worth 3 points of
+  the overall score, one expert case about 2. A case missed by a single field counts as missed.
 - **The core tier is one run per model.**
 - **Same-family effects.** The items were written with the help of a model from the same family as two of the models
   tested, and the judge of record is one of the models tested. A second judge from a different model cross-checked
   every verdict and reached identical tier scores.
-- **One expert key was found unsupported after publication.** In the expert Hong Kong shop claim, the date by which
-  the employer's notice of an employee's injury is due was keyed from a rule that no allowed source states (the
-  Labour Department's form counts 14 days from the accident). Claude Fable 5.2 answered that way and missed only that
-  date, in all three runs; without it, its overall would be about 70 and its insurance score about 80. The other models' results do
-  not change. The scores above are left as graded; the rebuilt tiers drop that date.
+- **Known limits of the keys.** Before the rebuilt tiers were frozen, every case and question key was audited again
+  against official sources, and what the audit found was corrected or settled by changing the facts. What remains:
+  nine Ontario accident-benefit rules behind one insurance question family were read at the official source on 9
+  November but could not be read a second time in the last round, because the site refused automated access; one
+  Korean corporate-tax point rests on a court ruling, with no tax-authority text on today's wording read; and in three
+  cases a convention given to the solver departs from the law on purpose, with the keys following the convention.
+- **One core-tier table is out of date.** A table of Hong Kong profits-tax return due dates in the core tier predates
+  two circulars of July and October 2026. It is listed for correction; the core scores are left as graded.
+- **Qwen 3.8 27B was not run on the rebuilt hard and expert tiers.** Its hard and expert figures (0 and 0) are from the
+  pilot tiers, so its overall is not measured on the same hard and expert set as the two Claude models.
+- **The first results used a pilot set, and two of its keys were later found at fault.** A notice date in the expert
+  Hong Kong shop claim was unsupported, which counted against Claude Fable 5.2; a VAT cut-off in the French year-end
+  case was keyed on the wrong return, which counted in its favour. The rebuilt tiers correct both. See the end of
+  [RESULTS.md](RESULTS.md).
 - **Qwen 3.8 27B was run a second time** on 16 and 17 November, after fixes to the agent loop: the model is now told its
   step limit and which pages left view, and a reply cut at the token limit is recovered. It had 16,000 tokens a step
   instead of 6,000, and wrote its working in the reply for text questions. Its overall went from 2 to 5 and its core
@@ -159,7 +173,8 @@ want yours evaluated, write to hello@qandy.ai.
 ## Roadmap
 
 - QANDY 2.0 27B on the same tests.
-- The hard and expert tiers rebuilt on fresh cases, with more case types per domain.
+- Qwen 3.8 27B on the rebuilt hard and expert tiers.
+- More case types per domain in the hard and expert tiers.
 - Three runs of the core tier for every model.
 - Live paper trading.
 
