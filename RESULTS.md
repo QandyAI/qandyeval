@@ -85,7 +85,7 @@ this file's git history.
 |---|---|---|---|---|
 | Personal tax | 18 | 0 | 0 | 4 |
 | Corporate tax & accounting | 19 | 0 | 0 | 4 |
-| Save | 23 | 0 | 0 | 4 |
+| Save | 20 | 0 | 0 | 4 |
 | Trading | 36 | 0 | 0 | 7 |
 | Insurance | 29 | 0 | 0 | 6 |
 | **All** | 24 | 0 | 0 | **5** |
@@ -96,7 +96,7 @@ this file's git history.
 |---|---|---|---|---|
 | Personal tax | 19 | 0 | 0 | 4 |
 | Corporate tax & accounting | 18 | 0 | 0 | 4 |
-| Save | 4 | 0 | 0 | 1 |
+| Save | 0 | 0 | 0 | 0 |
 | Trading | 45 | 0 | 0 | 9 |
 | Insurance | 35 | 0 | 0 | 7 |
 | **All** | 23 | 0 | 0 | **5** |
@@ -125,5 +125,5 @@ this file's git history.
 
 - Claude Fable 5.2 and Claude Opus 5.5: one blind solver per shard, extra-high reasoning effort; core tier one run (587 sampled items), hard and expert tiers three runs (15 shards each). All hard and expert transcripts passed the audit.
 - Qwen 3.8 27B (second run): hosted OpenAI-compatible API with the agent loop in `runners/`; 120 steps per core shard, 200 per case shard, 16,000 tokens a step, at most 4 page images per request, reasoning off (the service cannot cap it), temperature 0, seeds 1, 2 and 3 for the three hard and expert runs; text questions with the working written in the reply, 6,000 tokens. 18 of its 67 core shards and 8 of its 30 case shards stopped at the step limit (27 of 30 in the first run). The run was paused for 18 hours; the 18 shards it cut off were restarted from clean copies.
-- Letters and advice answers: two independent judges with the same prompt (`docs/JUDGE_PROMPT.md`); both gave the same tier scores for the Claude models and Qwen's first run. Qwen's second run has so far been marked by the Claude Opus 5.5 judge; its hard and expert scores cannot depend on the judge (no case had its other deliverables right in all three runs, no question was right in all three).
+- Letters and advice answers: two independent judges with the same prompt (`docs/JUDGE_PROMPT.md`); both gave the same tier scores for every model. For Qwen 3.8 27B's second run they differ on one core Save memo, which the judge of record (Claude Fable 5.2) did not pass and the second judge (Claude Opus 5.5) did: its core Save score is 20 with the judge of record, as shown, and 23 with the second judge; no tier or overall figure changes.
 - 9 live paper-trading items in the core sample are not run yet and are left out of every score.

@@ -112,9 +112,7 @@ How each model was run for the results above:
 | Hard and expert | Three runs | Three runs |
 
 All 45 hard and expert solver transcripts of each Claude model passed the audit. Both judges gave the same tier scores for
-the Claude models and for Qwen 3.8 27B's first run. Qwen's second run has so far been marked by one judge (Claude Opus
-5.5); its hard and expert scores cannot depend on the judge, because no case had its other deliverables right in all
-three runs and no question was right in all three.
+every model (for Qwen 3.8 27B's second run they differ on one core memo, which moves no figure in the tables above).
 
 ## Limits of these first results
 
