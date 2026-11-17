@@ -136,6 +136,12 @@ every model (for Qwen 3.8 27B's second run they differ on one core memo, which m
   tier from 10 to 24. It still stopped at its step limit on 18 of 67 core shards and 8 of 30 case shards (27 of 30 the
   first time), saw at most four page images at a time and ran with reasoning off, so its score reflects that setup as
   well as the model. The run was paused for 18 hours; the 18 shards it cut off were restarted from clean copies.
+- **Some of Qwen 3.8 27B's text replies were cut.** In its second run a text reply had 6,000 tokens, and a reply that
+  was still streaming after about 30 minutes ended without a finish reason (the service was slow; whether the runner's
+  or the service's time limit ended it was not determined). 55 of the 369 core text replies and 79 of the 180 hard and
+  expert question replies did not reach their own answer this way (12 and 45 of them at the token limit). The runner
+  then asks once, in a short second request, for the answer from the working so far. 4 of those 55 core answers were
+  fully right, against 87 of the 314 complete ones. No hard or expert question was right in all three runs either way.
 
 ## What is in this repository, and what is not
 
